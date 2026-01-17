@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+<!-- ADD TO HOME SCREEN -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="8D Music">
+<meta name="theme-color" content="#000000">
+
+<title>8D Music Player</title>
+
+<style>
+:root { --primary:#1DB954; --bg:#0b0b0b; }
+body{
+    margin:0; height:100vh;
+    display:flex; justify-content:center; align-items:center;
+    background:var(--bg); color:white;
+    font-family:Segoe UI,sans-serif;
+}
+.player{
+    width:90%; max-width:360px;
+    background:#181818;
+    padding:20px; border-radius:20px;
+    box-shadow:0 15px 35px rgba(0,0,0,.7);
+    text-align:center;
+}
+input[type=file]{
+    width:100%;
+    background:#222;
+    color:#aaa;
+    border:none;
+    padding:10px;
+    border-radius:10px;
+    margin-bottom:10px;
+}
+.playlist{
+    max-height:120px; overflow:auto;
+    background:#222; border-radius:10px;
+    margin-bottom:10px;
+}
+.track{
+    padding:8px;
+    font-size:.8em;
+    border-bottom:1px solid #333;
+    cursor:pointer;
+}
+.track.active{color:var(--primary);}
+button{
+    width:100%; margin-top:8px;
+    padding:12px;
+    background:var(--primary);
+    border:none; border-radius:10px;
+    color:white; font-weight:bold;
+}
+label{font-size:.7em;color:#aaa;display:block;text-align:left;}
+input[type=range]{width:100%;accent-color:var(--primary);}
+</style>
+</head>
+
+<body>
+<div class="player">
+    <h3 style="color:var(--primary)">8D Background Player</h3>
+
+    <!-- CHỌN FILE MP3 -->
+    <input type="file" id="fileInput" accept=".mp3,audio/mpeg" multiple>
+
+    <div class="playlist" id="playlist"></div>
+
+    <label>Tốc độ: <span id="tLabel">1.0</span>x</label>
+    <input type="range" id="tempo" min="0.5" max="2" step="0.1" value="1">
+
+    <label>Độ xoay 8D: <span id="sLabel">5</span></label>
+    <input type="range" id="strength" min="0" max="15" step="1" value="5">
+
+    <button id="playBtn">BẮT ĐẦU PHÁT</button>
+    <p id="now" style="font-size:.7em;color:#666"></p>
+</div>
+
+<script>
+let audio = new Audio();
+audio.preload="auto";
+audio.playsInline=true;
+audio.setAttribute("playsinline","");
+audio.setAttribute("webkit-playsinline","");
+
+let ctx,src,panner;
+let list=[],index=0,angle=0;
+
+// chọn mp3
+fileInput.onchange=e=>{
+    list=[...e.target.files].filter(f=>f.type==="audio/mpeg");
+    render();
+    if(list.length) load(0);
+};
+
+function render(){
+    playlist.innerHTML=list.map((f,i)=>
+        `<div class="track ${i===index?'active':''}" onclick="load(${i})">
+            ${i+1}. ${f.name}
+        </div>`
+    ).join("");
+}
+
+function load(i){
+    index=i;
+    audio.src=URL.createObjectURL(list[i]);
+    now.innerText=list[i].name;
+    render();
+    media(list[i].name);
+}
+
+playBtn.onclick=()=>{
+    if(!ctx){
+        ctx=new (window.AudioContext||webkitAudioContext)();
+        src=ctx.createMediaElementSource(audio);
+        panner=ctx.createPanner();
+        panner.panningModel="HRTF";
+        src.connect(panner).connect(ctx.destination);
+        setInterval(rotate,30);
+    }
+    audio.paused?(ctx.resume(),audio.play(),playBtn.innerText="TẠM DỪNG")
+                 :(audio.pause(),playBtn.innerText="TIẾP TỤC");
+};
+
+function rotate(){
+    if(audio.paused) return;
+    let r=strength.value;
+    panner.positionX.value=Math.sin(angle)*r;
+    panner.positionZ.value=Math.cos(angle)*r;
+    angle+=0.02*audio.playbackRate;
+}
+
+audio.onended=()=>load((index+1)%list.length);
+
+tempo.oninput=()=>{audio.playbackRate=tempo.value;tLabel.innerText=tempo.value;}
+strength.oninput=()=>sLabel.innerText=strength.value;
+
+// media session = phát nền
+function media(title){
+if("mediaSession"in navigator){
+navigator.mediaSession.metadata=new MediaMetadata({
+title,artist:"8D Music Player"
+});
+navigator.mediaSession.setActionHandler("play",()=>audio.play());
+navigator.mediaSession.setActionHandler("pause",()=>audio.pause());
+}}
+</script>
+</body>
+</html>
